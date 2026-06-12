@@ -3,7 +3,7 @@ import json
 def main():
     print("Đang tải dữ liệu...")
     
-    # 1. Đọc file dictionary.json GỐC (File này phải chứa nghĩa tiếng Việt ban đầu)
+    # 1. Đọc file dictionary.json GỐC
     try:
         with open('dictionary.json', 'r', encoding='utf-8') as f:
             my_dict = json.load(f)
@@ -41,27 +41,20 @@ def main():
                 "nghia": nghia_ngan
             }
 
-    print("Bắt đầu đối chiếu và khôi phục Nghĩa Tiếng Việt...")
+    print("Bắt đầu đối chiếu, cứu nghĩa gốc và đóng gói nén dữ liệu...")
 
-    count = 0
     for word, data in my_dict.items():
+        # Cứu lại nghĩa gốc tiếng Anh đưa vào word_meaning
+        data['word_meaning'] = data.get('meaning', '')
         
-        # ĐÂY LÀ BƯỚC QUAN TRỌNG NHẤT: Cứu lại nghĩa gốc!
-        # Lưu nghĩa tiếng Việt tổng thể vào thuộc tính mới tên là "word_meaning"
-        nghia_goc_cua_tu = data.get('meaning', '')
-        data['word_meaning'] = nghia_goc_cua_tu
-        
-        # Bắt đầu xử lý Chữ đơn
+        # Sắp xếp lại Âm Hán Việt và giải nghĩa Thiều Chửu
         if len(word) == 1 and word in tc_map:
             data['hanviet'] = tc_map[word]['am_han_ngan'].capitalize()
             data['meaning'] = f"[{tc_map[word]['am_han_full'].capitalize()}] {tc_map[word]['nghia']}"
-            count += 1
             
-        # Xử lý Từ ghép
         elif len(word) > 1:
             hanviet_list = []
             meaning_list = []
-            
             for char in word:
                 if char in tc_map:
                     hanviet_list.append(tc_map[char]['am_han_ngan'])
@@ -70,17 +63,16 @@ def main():
                     hanviet_list.append("...")
             
             data['hanviet'] = " ".join(hanviet_list).title()
-            
             if meaning_list:
                 data['meaning'] = " | ".join(meaning_list)
-                count += 1
 
-    # 5. Xuất ra file dictionary_vi.json
+    # 3. Xuất file dạng MINIFY (Xóa bỏ toàn bộ indent và khoảng trắng thừa)
     output_file = 'dictionary_vi.json'
     with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(my_dict, f, ensure_ascii=False, indent=4)
+        # BÍ QUYẾT Ở ĐÂY: Xóa bỏ indent=4 và thay bằng separators=(',', ':')
+        json.dump(my_dict, f, ensure_ascii=False, separators=(',', ':'))
 
-    print(f"Hoàn tất! Đã thêm thành công 'word_meaning' cho {count} từ vựng.")
+    print(f"Hoàn tất! File '{output_file}' đã được nén xuống dung lượng tối thiểu.")
 
 if __name__ == "__main__":
     main()
