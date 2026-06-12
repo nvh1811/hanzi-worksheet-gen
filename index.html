@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Taiwan Worksheet - Ultimate Edition v5</title>
+    <title>Taiwan Worksheet - Ultimate Edition v7</title>
     <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.min.js"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; }
@@ -77,7 +77,7 @@
         
         .stroke-step {
             position: relative; width: 44px; height: 44px; border: 1px dashed #999;
-            flex-shrink: 0; display: flex; justify-content: center; align-items: center;
+            flex-shrink: 0; display: flex; justify-content: center; align-items: center; overflow: hidden;
         }
         .main-char-title { font-size: 30px; font-weight: bold; font-family: Kaiti, STKaiti, serif; margin: 0 8px 0 0; display: flex; align-items: center; flex-shrink: 0; }
 
@@ -96,7 +96,8 @@
         .char-render { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         .char-render img {
             position: absolute; left: 50%; top: 50%;
-            width: 80%; height: 80%; object-fit: contain; transform: translate(-50%, -50%);
+            width: 92%; height: 92%; /* ĐÃ PHÓNG TO CHỮ */
+            object-fit: contain; transform: translate(-50%, -50%);
         }
 
         .editable-text {
@@ -226,8 +227,9 @@
             return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
         }
 
-        function createSvgImageUrl(pathsHtml, viewBox = "-80 -80 1184 1184") {
-            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="1024" height="1024"><g transform="translate(0,1024) scale(1,-1)">${pathsHtml}</g></svg>`;
+        // ĐÃ FIX: Chỉnh translate(0,900) để đưa chữ về chính giữa, loại bỏ padding thừa
+        function createSvgImageUrl(pathsHtml, viewBox = "0 0 1024 1024") {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="1024" height="1024"><g transform="translate(0,900) scale(1,-1)">${pathsHtml}</g></svg>`;
             return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
         }
 
@@ -307,24 +309,23 @@
                     const group = document.createElement('div'); group.className = 'word-group';
                     const wordInfo = dict[cleanWord] || { pinyin: "...", hanviet: "...", meaning: "...", word_meaning: "" };
 
-                    // --- CHÚ ĐẠO: TỰ ĐỘNG DỊCH CHỮ HÁN SANG NGHĨA TIẾNG VIỆT ---
                     let targetMeaning = wordInfo.word_meaning;
                     
-                    // Nếu dữ liệu trống hoặc đang ở dạng tiếng Anh gốc (CC-CEDICT), tiến hành gọi API dịch tự động
-                    if (!targetMeaning || targetMeaning === "..." || /^[a-zA-Z0-9\s,.;:-]+$/.test(targetMeaning)) {
+                    const hasVietnamese = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐ]/i.test(targetMeaning);
+                    
+                    if (!targetMeaning || targetMeaning === "..." || !hasVietnamese) {
                         try {
                             const transRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=vi&dt=t&q=${encodeURIComponent(cleanWord)}`);
                             if (transRes.ok) {
                                 const transData = await transRes.json();
                                 if (transData && transData[0] && transData[0][0]) {
-                                    targetMeaning = transData[0][0][0]; // Lấy chuỗi tiếng Việt đã dịch
+                                    targetMeaning = transData[0][0][0]; 
                                 }
                             }
                         } catch (e) {
                             targetMeaning = "Nhấp để sửa nghĩa...";
                         }
                     }
-                    // -----------------------------------------------------------
 
                     let meaningHtml = "";
                     if (showMeaningText) {
@@ -385,7 +386,8 @@
                                     
                                     const img = document.createElement("img");
                                     img.src = createSvgImageUrl(pathsHtml);
-                                    img.style.width = "40px"; img.style.height = "40px"; img.style.objectFit = "contain";
+                                    // ĐÃ FIX: Phóng to hình hướng dẫn nét cho cân xứng
+                                    img.style.width = "90%"; img.style.height = "90%"; img.style.objectFit = "contain";
                                     step.appendChild(img);
                                     charStrokeRow.appendChild(step);
                                 }
@@ -420,11 +422,11 @@
                                     const img = document.createElement("img");
                                     img.src = createSvgImageUrl(pathsHtml);
                                     img.style.position = "absolute"; img.style.left = "50%"; img.style.top = "50%";
-                                    img.style.transform = "translate(-50%,-50%)"; img.style.width = "80%"; img.style.height = "80%";
-                                    img.style.objectFit = "contain";
+                                    img.style.transform = "translate(-50%,-50%)"; 
+                                    // CSS ĐÃ ĐƯỢC ĐƯA LÊN TRÊN OBJECT .char-render img THÀNH 92%
                                     render.appendChild(img);
                                 } else {
-                                    render.innerHTML = `<span style="font-size:24px; font-family: Kaiti, serif; color: ${fadedColor};">${charObj.char}</span>`;
+                                    render.innerHTML = `<span style="font-size:32px; font-family: Kaiti, serif; color: ${fadedColor};">${charObj.char}</span>`;
                                 }
                             }
                             row.appendChild(box);
