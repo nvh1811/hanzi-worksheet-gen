@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Taiwan Worksheet - Ultimate Edition v5</title>
+    <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
+        :root {
+            --bg: #333; 
+            --grid-color: #a0b8d0;
+            --char-color: #e63946;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            padding: 20px; margin: 0;
+        }
+
+        .panel {
+            width: 320px; background: white; padding: 20px; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); position: fixed; top: 20px;
+            max-height: 95vh; overflow-y: auto;
+        }
+        .panel::-webkit-scrollbar { width: 6px; }
+        .panel::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+
+        .input-group { display: flex; flex-direction: column; margin-bottom: 15px; }
+        .input-group-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .input-group label { margin-bottom: 5px; font-weight: 500; font-size: 14px; color: #333; }
+
+        input[type="text"], textarea { width: 100%; font-size: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        textarea { height: 80px; resize: vertical; }
+        input[type="number"] { width: 60px; padding: 5px; }
+        input[type="color"] { border: none; width: 40px; height: 40px; cursor: pointer; padding: 0; }
+
+        button {
+            width: 100%; padding: 12px; border: none; border-radius: 4px; cursor: pointer;
+            font-weight: bold; font-size: 14px; margin-bottom: 10px; color: white; transition: 0.2s;
+        }
+        .btn-run { background: #007bff; } .btn-run:hover { background: #0056b3; }
+        .btn-pdf { background: #28a745; } .btn-pdf:hover { background: #218838; }
+
+        .preview {
+            margin-left: 340px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 20px; 
+            padding: 20px; 
+        }
+        
+        .a4-page {
+            width: 210mm; 
+            height: 297mm; 
+            background: white; 
+            padding: 15mm;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5); 
+            overflow: hidden; 
+            position: relative;
+        }
+
+        .page-header { text-align: center; margin-bottom: 30px; }
+        .page-title { font-size: 26px; font-weight: bold; text-transform: uppercase; color: #222; margin: 0 0 8px 0; letter-spacing: 1px; }
+        .lesson-name { font-size: 18px; color: #555; font-style: italic; margin: 0; }
+
+        .word-group {
+            border: 2px solid #333; margin-bottom: 25px; display: block; width: 100%;
+        }
+        
+        .word-header { background: #e9ecef; padding: 10px; }
+        .stroke-container { display: flex; flex-direction: column; gap: 5px; padding: 10px; border-bottom: 1px solid #333; background: #fff; }
+        .char-stroke-row { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; align-items: center; margin-bottom: 4px; }
+        
+        .stroke-step {
+            position: relative; width: 44px; height: 44px; border: 1px dashed #999;
+            flex-shrink: 0; display: flex; justify-content: center; align-items: center;
+        }
+        .main-char-title { font-size: 30px; font-weight: bold; font-family: Kaiti, STKaiti, serif; margin: 0 8px 0 0; display: flex; align-items: center; flex-shrink: 0; }
+
+        .grid-container { display: flex; flex-direction: column; width: 100%; }
+        .grid-row { display: flex; border-bottom: 1px solid var(--grid-color); width: 100%; }
+        .grid-row:last-child { border-bottom: none; }
+        .grid-box { width: calc(100% / 12); aspect-ratio: 1/1; border-right: 1px solid var(--grid-color); position: relative; }
+        .grid-box:last-child { border-right: none; }
+        
+        .line-x { position: absolute; width: 100%; top: 50%; border-top: 1px dashed var(--grid-color); opacity: 0.6; }
+        .line-y { position: absolute; height: 100%; left: 50%; border-left: 1px dashed var(--grid-color); opacity: 0.6; }
+        .diag1, .diag2 { position: absolute; width: 141%; height: 0; border-top: 1px dashed var(--grid-color); top: 0; opacity: 0.6; }
+        .diag1 { left: 0; transform-origin: top left; transform: rotate(45deg); }
+        .diag2 { right: 0; transform-origin: top right; transform: rotate(-45deg); }
+
+        .char-render { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .char-render img {
+            position: absolute; left: 50%; top: 50%;
+            width: 80%; height: 80%; object-fit: contain; transform: translate(-50%, -50%);
+        }
+
+        .editable-text {
+            cursor: text;
+            outline: none;
+            border-bottom: 1px dashed transparent;
+            transition: 0.2s;
+        }
+        .editable-text:hover, .editable-text:focus {
+            border-bottom: 1px dashed #333;
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 0;
+            }
+            body {
+                background: white !important;
+                margin: 0; padding: 0;
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact;
+            }
+            .panel { display: none !important; }
+            .preview {
+                margin: 0 !important; padding: 0 !important;
+                display: block !important;
+                gap: 0 !important;
+            }
+            .a4-page {
+                box-shadow: none !important; 
+                margin: 0 !important;
+                page-break-after: always;
+                page-break-inside: avoid;
+            }
+            .editable-text { border-bottom: none !important; background: transparent !important; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="panel">
+        <h2 style="margin-top:0; margin-bottom: 20px; font-size: 22px;">Tạo Vở Tập Viết</h2>
+
+        <div class="input-group">
+            <label>Tiêu đề trang:</label>
+            <input type="text" id="pageTitle" value="VỞ TẬP VIẾT CHỮ HÁN">
+        </div>
+
+        <div class="input-group">
+            <label>Tên bài / Ghi chú:</label>
+            <input type="text" id="lessonName" placeholder="VD: Bài 1: Xin chào">
+        </div>
+
+        <div class="input-group">
+            <label>Nhập từ vựng cần luyện:</label>
+            <textarea id="inputText">臺灣 電路 你好 再見</textarea>
+        </div>
+
+        <div class="input-group-row">
+            <label style="margin: 0;">Số dòng kẻ / cụm:</label>
+            <input type="number" id="numRows" value="3" min="1" max="10">
+        </div>
+        <div class="input-group-row">
+            <label style="margin: 0;">Màu viền lưới:</label>
+            <input type="color" id="colorGrid" value="#a0b8d0">
+        </div>
+        <div class="input-group-row">
+            <label style="margin:0;">Màu chữ mẫu:</label>
+            <input type="color" id="colorChar" value="#e63946">
+        </div>
+        
+        <div class="input-group-row">
+            <label style="margin:0;">Hiển thị thứ tự nét:</label>
+            <input type="checkbox" id="showStrokeOrder" checked>
+        </div>
+        
+        <div class="input-group-row">
+            <label style="margin:0;">Hiển thị giải nghĩa:</label>
+            <input type="checkbox" id="showMeaningText" checked>
+        </div>
+
+        <div class="input-group-row">
+            <label style="margin:0;">Thêm dòng tự đặt câu:</label>
+            <input type="checkbox" id="showSentenceLine" checked>
+        </div>
+
+        <div class="input-group-row">
+            <label style="margin:0;">Kiểu chữ:</label>
+            <select id="scriptType" style="width:120px; padding:6px;">
+                <option value="auto">Tự động</option>
+                <option value="traditional" selected>Phồn thể</option>
+                <option value="simplified">Giản thể</option>
+            </select>
+        </div>
+        
+        <button class="btn-run" onclick="generate()">Bắt đầu tạo vở</button>
+        <button class="btn-pdf" onclick="exportPDF()">Lưu File PDF</button>
+    </div>
+
+    <div class="preview" id="preview-container"></div>
+
+    <script>
+        let dict = {};
+
+        async function convertScript(text, mode) {
+            if (mode === 'auto') return text;
+            try {
+                if (mode === 'traditional') {
+                    const converter = OpenCC.Converter({ from: 'cn', to: 'tw' });
+                    return converter(text);
+                }
+                if (mode === 'simplified') {
+                    const converter = OpenCC.Converter({ from: 'tw', to: 'cn' });
+                    return converter(text);
+                }
+            } catch (e) {}
+            return text;
+        }
+
+        function getLighterColor(hex, percent) {
+            hex = hex.replace('#', '');
+            let r = parseInt(hex.substring(0, 2), 16); let g = parseInt(hex.substring(2, 4), 16); let b = parseInt(hex.substring(4, 6), 16);
+            r = Math.round(r + (255 - r) * percent); g = Math.round(g + (255 - g) * percent); b = Math.round(b + (255 - b) * percent);
+            const toHex = (c) => { const h = c.toString(16); return h.length === 1 ? '0' + h : h; };
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        }
+
+        function createSvgImageUrl(pathsHtml, viewBox = "-80 -80 1184 1184") {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="1024" height="1024"><g transform="translate(0,1024) scale(1,-1)">${pathsHtml}</g></svg>`;
+            return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+        }
+
+        async function loadStroke(c) {
+            try {
+                let res = await fetch(`./data/${encodeURIComponent(c)}.json`);
+                if (res.ok) {
+                    let d = await res.json();
+                    if (d && Array.isArray(d.strokes)) return d;
+                }
+            } catch (e) {}
+            try {
+                let res = await fetch(`https://cdn.jsdelivr.net/npm/hanzi-writer-data@latest/data/${encodeURIComponent(c)}.json`);
+                if (res.ok) {
+                    let d = await res.json();
+                    if (d && Array.isArray(d.strokes)) return d;
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const res = await fetch('./dictionary_vi.json?t=' + new Date().getTime());
+                dict = await res.json();
+            } catch (e) {}
+            generate();
+        });
+
+        function createNewPage() {
+            const page = document.createElement('div');
+            page.className = 'a4-page';
+            return page;
+        }
+
+        async function generate() {
+            const btn = document.querySelector('.btn-run');
+            const originalText = btn.innerText;
+            btn.innerText = "Đang xử lý..."; btn.style.pointerEvents = "none"; btn.style.opacity = "0.7";
+
+            try {
+                const previewContainer = document.getElementById('preview-container');
+                previewContainer.innerHTML = '';
+
+                let currentPage = createNewPage();
+                previewContainer.appendChild(currentPage);
+
+                const titleVal = document.getElementById('pageTitle').value.trim();
+                const lessonVal = document.getElementById('lessonName').value.trim();
+
+                if (titleVal || lessonVal) {
+                    const headerDiv = document.createElement('div'); headerDiv.className = 'page-header';
+                    if (titleVal) headerDiv.innerHTML += `<h1 class="page-title">${titleVal}</h1>`;
+                    if (lessonVal) headerDiv.innerHTML += `<h2 class="lesson-name">${lessonVal}</h2>`;
+                    currentPage.appendChild(headerDiv);
+                }
+
+                let rawText = document.getElementById('inputText').value;
+                const scriptType = document.getElementById('scriptType').value;
+                rawText = await convertScript(rawText, scriptType);
+
+                const words = rawText.trim().split(/\s+/);
+                const numRows = parseInt(document.getElementById('numRows').value) || 3;
+                const charColor = document.getElementById('colorChar').value;
+                const showStrokeOrder = document.getElementById('showStrokeOrder').checked;
+                const showMeaningText = document.getElementById('showMeaningText').checked;
+                const showSentenceLine = document.getElementById('showSentenceLine').checked;
+
+                document.documentElement.style.setProperty('--grid-color', document.getElementById('colorGrid').value);
+                const fadedColor = getLighterColor(charColor, 0.80);
+
+                for (let word of words) {
+                    let cleanWord = word.replace(/[^\u3400-\u9FFF]/g, '');
+                    cleanWord = await convertScript(cleanWord, scriptType);
+                    if (!cleanWord) continue;
+
+                    const group = document.createElement('div'); group.className = 'word-group';
+                    const wordInfo = dict[cleanWord] || { pinyin: "...", hanviet: "...", meaning: "...", word_meaning: "" };
+
+                    // --- CHÚ ĐẠO: TỰ ĐỘNG DỊCH CHỮ HÁN SANG NGHĨA TIẾNG VIỆT ---
+                    let targetMeaning = wordInfo.word_meaning;
+                    
+                    // Nếu dữ liệu trống hoặc đang ở dạng tiếng Anh gốc (CC-CEDICT), tiến hành gọi API dịch tự động
+                    if (!targetMeaning || targetMeaning === "..." || /^[a-zA-Z0-9\s,.;:-]+$/.test(targetMeaning)) {
+                        try {
+                            const transRes = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=zh-CN&tl=vi&dt=t&q=${encodeURIComponent(cleanWord)}`);
+                            if (transRes.ok) {
+                                const transData = await transRes.json();
+                                if (transData && transData[0] && transData[0][0]) {
+                                    targetMeaning = transData[0][0][0]; // Lấy chuỗi tiếng Việt đã dịch
+                                }
+                            }
+                        } catch (e) {
+                            targetMeaning = "Nhấp để sửa nghĩa...";
+                        }
+                    }
+                    // -----------------------------------------------------------
+
+                    let meaningHtml = "";
+                    if (showMeaningText) {
+                        meaningHtml = `
+                        <div style="font-size: 14px; font-weight: normal; color: #333; line-height: 1.4; padding-top: 6px; border-top: 1px dashed #ccc;">
+                            ${wordInfo.meaning}
+                        </div>`;
+                    }
+
+                    group.innerHTML = `
+                        <div class="word-header" style="display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid #333;">
+                            <div style="display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; padding-bottom: ${showMeaningText ? '0px' : '4px'};">
+                                <span style="color:${charColor}; font-family: Kaiti, STKaiti, serif; font-size: 28px; line-height: 1;">${cleanWord}</span>
+                                <span style="font-size: 16px; color: #d9534f; font-weight: bold;">/ ${wordInfo.pinyin} /</span>
+                                <span style="font-size: 16px; color: #0056b3; font-weight: bold;">[ ${wordInfo.hanviet} ]</span>
+                                <span style="font-size: 16px; color: #222; font-weight: bold;">—</span>
+                                <span contenteditable="true" spellcheck="false" class="editable-text" style="font-size: 16px; color: #222; font-weight: bold; min-width: 50px;" title="Click để sửa lại nghĩa nếu cần">${targetMeaning}</span>
+                            </div>
+                            ${meaningHtml}
+                        </div>
+                    `;
+
+                    const strokes = document.createElement('div'); strokes.className = 'stroke-container';
+                    group.appendChild(strokes);
+                    const grid = document.createElement('div'); grid.className = 'grid-container';
+                    group.appendChild(grid);
+
+                    let wordData = [];
+
+                    for (const char of cleanWord) {
+                        let displayChar = char;
+                        let charData = await loadStroke(displayChar);
+
+                        if (!charData) {
+                            const simp = await convertScript(displayChar, "simplified");
+                            if (simp !== displayChar) charData = await loadStroke(simp);
+                        }
+                        if (!charData) {
+                            const trad = await convertScript(displayChar, "traditional");
+                            if (trad !== displayChar) charData = await loadStroke(trad);
+                        }
+                        wordData.push({ char: displayChar, data: charData });
+                    }
+
+                    if (showStrokeOrder) {
+                        for (let item of wordData) {
+                            const charStrokeRow = document.createElement('div'); charStrokeRow.className = 'char-stroke-row';
+                            const charTitle = document.createElement('div'); charTitle.className = 'main-char-title';
+                            charTitle.style.color = charColor; charTitle.innerText = item.char;
+                            charStrokeRow.appendChild(charTitle);
+
+                            if (item.data) {
+                                for (let i = 0; i < item.data.strokes.length; i++) {
+                                    const step = document.createElement('div'); step.className = 'stroke-step';
+                                    let pathsHtml = '';
+                                    for (let k = 0; k < i; k++) { pathsHtml += `<path d="${item.data.strokes[k]}" fill="#cccccc"/>`; }
+                                    pathsHtml += `<path d="${item.data.strokes[i]}" fill="${charColor}"/>`;
+                                    
+                                    const img = document.createElement("img");
+                                    img.src = createSvgImageUrl(pathsHtml);
+                                    img.style.width = "40px"; img.style.height = "40px"; img.style.objectFit = "contain";
+                                    step.appendChild(img);
+                                    charStrokeRow.appendChild(step);
+                                }
+                            } else {
+                                const errorMsg = document.createElement('div');
+                                errorMsg.style.cssText = 'font-size: 12px; color: red; margin: 0 5px;';
+                                errorMsg.innerText = '(Thiếu nét)';
+                                charStrokeRow.appendChild(errorMsg);
+                            }
+                            strokes.appendChild(charStrokeRow);
+                        }
+                    } else {
+                        strokes.style.display = "none";
+                    }
+
+                    let numTrace = cleanWord.length * 2;
+                    if (numTrace > 8) numTrace = cleanWord.length;
+
+                    for (let r = 0; r < numRows; r++) {
+                        const row = document.createElement('div'); row.className = 'grid-row';
+                        for (let c = 0; c < 12; c++) {
+                            const box = document.createElement('div'); box.className = 'grid-box';
+                            box.innerHTML = '<div class="line-x"></div><div class="line-y"></div><div class="diag1"></div><div class="diag2"></div>';
+
+                            const index = c % cleanWord.length; const charObj = wordData[index];
+                            if (r === 0 && c < numTrace) {
+                                const render = document.createElement('div'); render.className = 'char-render';
+                                box.appendChild(render);
+
+                                if (charObj.data) {
+                                    let pathsHtml = charObj.data.strokes.map(s => `<path d="${s}" fill="${fadedColor}"/>`).join('');
+                                    const img = document.createElement("img");
+                                    img.src = createSvgImageUrl(pathsHtml);
+                                    img.style.position = "absolute"; img.style.left = "50%"; img.style.top = "50%";
+                                    img.style.transform = "translate(-50%,-50%)"; img.style.width = "80%"; img.style.height = "80%";
+                                    img.style.objectFit = "contain";
+                                    render.appendChild(img);
+                                } else {
+                                    render.innerHTML = `<span style="font-size:24px; font-family: Kaiti, serif; color: ${fadedColor};">${charObj.char}</span>`;
+                                }
+                            }
+                            row.appendChild(box);
+                        }
+                        grid.appendChild(row);
+                    }
+
+                    if (showSentenceLine) {
+                        const sentenceBox = document.createElement('div');
+                        sentenceBox.style.borderTop = "1px solid #333";
+                        sentenceBox.style.padding = "25px 15px 15px 15px";
+                        sentenceBox.style.backgroundColor = "white";
+                        sentenceBox.innerHTML = `
+                            <div style="border-bottom: 1.5px dashed var(--grid-color); margin-bottom: 28px; position: relative;">
+                                <span style="position: absolute; bottom: 4px; font-size: 14px; color: #555; font-style: italic; font-weight: 500;">✍️ Tự đặt câu:</span>
+                            </div>
+                            <div style="border-bottom: 1.5px dashed var(--grid-color);"></div>
+                        `;
+                        group.appendChild(sentenceBox);
+                    }
+
+                    currentPage.appendChild(group); 
+                    
+                    if (currentPage.scrollHeight > currentPage.clientHeight) {
+                        currentPage.removeChild(group); 
+                        currentPage = createNewPage();
+                        previewContainer.appendChild(currentPage);
+                        currentPage.appendChild(group);
+                    }
+                }
+            } catch (err) {
+                console.error(err); alert("Đã xảy ra lỗi: " + err.message);
+            } finally {
+                btn.innerText = originalText; btn.style.pointerEvents = "auto"; btn.style.opacity = "1";
+            }
+        }
+
+        function exportPDF() {
+            window.print();
+        }
+    </script>
+</body>
+
+</html>
