@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Taiwan Worksheet - Ultimate Edition v7</title>
+    <title>Taiwan Worksheet - Ultimate Edition v9</title>
     <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.min.js"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; }
@@ -61,14 +61,16 @@
             box-shadow: 0 0 15px rgba(0,0,0,0.5); 
             overflow: hidden; 
             position: relative;
+            display: flex;
+            flex-direction: column;
         }
 
-        .page-header { text-align: center; margin-bottom: 30px; }
+        .page-header { text-align: center; margin-bottom: 30px; flex-shrink: 0; }
         .page-title { font-size: 26px; font-weight: bold; text-transform: uppercase; color: #222; margin: 0 0 8px 0; letter-spacing: 1px; }
         .lesson-name { font-size: 18px; color: #555; font-style: italic; margin: 0; }
 
         .word-group {
-            border: 2px solid #333; margin-bottom: 25px; display: block; width: 100%;
+            border: 2px solid #333; margin-bottom: 25px; display: block; width: 100%; flex-shrink: 0;
         }
         
         .word-header { background: #e9ecef; padding: 10px; }
@@ -96,7 +98,7 @@
         .char-render { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         .char-render img {
             position: absolute; left: 50%; top: 50%;
-            width: 92%; height: 92%; /* ĐÃ PHÓNG TO CHỮ */
+            width: 92%; height: 92%;
             object-fit: contain; transform: translate(-50%, -50%);
         }
 
@@ -227,7 +229,6 @@
             return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
         }
 
-        // ĐÃ FIX: Chỉnh translate(0,900) để đưa chữ về chính giữa, loại bỏ padding thừa
         function createSvgImageUrl(pathsHtml, viewBox = "0 0 1024 1024") {
             const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="1024" height="1024"><g transform="translate(0,900) scale(1,-1)">${pathsHtml}</g></svg>`;
             return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
@@ -301,6 +302,7 @@
                 document.documentElement.style.setProperty('--grid-color', document.getElementById('colorGrid').value);
                 const fadedColor = getLighterColor(charColor, 0.80);
 
+                // --- PHASE 1: VẼ TỪNG TỪ VỰNG NHƯ BÌNH THƯỜNG ---
                 for (let word of words) {
                     let cleanWord = word.replace(/[^\u3400-\u9FFF]/g, '');
                     cleanWord = await convertScript(cleanWord, scriptType);
@@ -310,7 +312,6 @@
                     const wordInfo = dict[cleanWord] || { pinyin: "...", hanviet: "...", meaning: "...", word_meaning: "" };
 
                     let targetMeaning = wordInfo.word_meaning;
-                    
                     const hasVietnamese = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđĐ]/i.test(targetMeaning);
                     
                     if (!targetMeaning || targetMeaning === "..." || !hasVietnamese) {
@@ -386,7 +387,6 @@
                                     
                                     const img = document.createElement("img");
                                     img.src = createSvgImageUrl(pathsHtml);
-                                    // ĐÃ FIX: Phóng to hình hướng dẫn nét cho cân xứng
                                     img.style.width = "90%"; img.style.height = "90%"; img.style.objectFit = "contain";
                                     step.appendChild(img);
                                     charStrokeRow.appendChild(step);
@@ -423,7 +423,6 @@
                                     img.src = createSvgImageUrl(pathsHtml);
                                     img.style.position = "absolute"; img.style.left = "50%"; img.style.top = "50%";
                                     img.style.transform = "translate(-50%,-50%)"; 
-                                    // CSS ĐÃ ĐƯỢC ĐƯA LÊN TRÊN OBJECT .char-render img THÀNH 92%
                                     render.appendChild(img);
                                 } else {
                                     render.innerHTML = `<span style="font-size:32px; font-family: Kaiti, serif; color: ${fadedColor};">${charObj.char}</span>`;
@@ -457,6 +456,64 @@
                         currentPage.appendChild(group);
                     }
                 }
+
+                // --- PHASE 2: THUẬT TOÁN ĐO TỌA ĐỘ TUYỆT ĐỐI ĐỂ PHỦ KÍN Ô LY ---
+                await new Promise(r => setTimeout(r, 50)); 
+                
+                const allPages = document.querySelectorAll('.a4-page');
+                allPages.forEach(page => {
+                    // 1. Tính toán tọa độ đáy an toàn của trang A4
+                    const style = window.getComputedStyle(page);
+                    const paddingBottom = parseFloat(style.paddingBottom);
+                    const pageRect = page.getBoundingClientRect();
+                    const maxBottom = pageRect.bottom - paddingBottom;
+
+                    // 2. Tạo khối lưới dự phòng (Khung viền mờ)
+                    const fillerGroup = document.createElement('div');
+                    fillerGroup.className = 'word-group';
+                    fillerGroup.style.borderColor = 'var(--grid-color)'; 
+                    fillerGroup.style.opacity = '0.9';
+                    fillerGroup.style.marginBottom = '0px'; 
+
+                    const fillerGrid = document.createElement('div');
+                    fillerGrid.className = 'grid-container';
+                    fillerGroup.appendChild(fillerGrid);
+                    
+                    page.appendChild(fillerGroup);
+
+                    let addedRows = 0;
+                    
+                    // 3. Bơm từng dòng và đo đạc trực tiếp
+                    while (true) {
+                        const row = document.createElement('div');
+                        row.className = 'grid-row';
+                        for (let c = 0; c < 12; c++) {
+                            const box = document.createElement('div');
+                            box.className = 'grid-box';
+                            box.innerHTML = '<div class="line-x"></div><div class="line-y"></div><div class="diag1"></div><div class="diag2"></div>';
+                            row.appendChild(box);
+                        }
+                        fillerGrid.appendChild(row);
+                        
+                        // Lấy tọa độ Y của chính dòng vừa vẽ
+                        const rowRect = row.getBoundingClientRect();
+                        
+                        // Nếu dòng này thò ra khỏi mép dưới của giấy (cho phép sai số 2px viền)
+                        if (rowRect.bottom > maxBottom + 2) {
+                            fillerGrid.removeChild(row); // Xóa bỏ dòng lỗi
+                            break; // Dừng việc nhét thêm
+                        }
+                        
+                        addedRows++;
+                        if (addedRows > 40) break; // Khóa an toàn 
+                    }
+
+                    // Nếu không nhét vừa dù chỉ 1 dòng, xóa luôn cái khung mờ đi cho sạch trang
+                    if (addedRows === 0) {
+                        page.removeChild(fillerGroup);
+                    }
+                });
+
             } catch (err) {
                 console.error(err); alert("Đã xảy ra lỗi: " + err.message);
             } finally {
